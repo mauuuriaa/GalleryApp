@@ -1,0 +1,11 @@
+<resources>
+
+    <string name="navigation_drawer_open">Открыть меню</string>
+    <string name="navigation_drawer_close">Закрыть меню</string>
+    <string name="select_category">Выберите категорию</string>
+    <string name="select_privacy">Выберите приватность</string>
+    <string name="show_photos">Показать фото</string>
+    <string name="app_name">Галерея</string>
+    <string name="prompt_select_category">Выберите категорию</string>
+    <string name="prompt_select_privacy">Выберите уровень секретности</string>
+</resources>
