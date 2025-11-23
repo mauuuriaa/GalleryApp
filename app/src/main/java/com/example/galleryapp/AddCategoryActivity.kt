@@ -17,43 +17,49 @@ class AddCategoryActivity : BaseActivity() {
 
     override fun getLayoutResId() = R.layout.activity_add_category
 
-    override fun onSetupDrawerMenu() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Инициализация Views
         editTextCategoryName = findViewById(R.id.editTextCategoryName)
         spinnerPrivacy = findViewById(R.id.spinnerPrivacy)
         buttonSaveCategory = findViewById(R.id.buttonSaveCategory)
 
+        setupUI()
+    }
+
+    private fun setupUI() {
         val privacyAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, privacyLevels)
         privacyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerPrivacy.adapter = privacyAdapter
 
         buttonSaveCategory.setOnClickListener {
-            try {
-                val name = editTextCategoryName.text.toString().trim()
-                val privacy = spinnerPrivacy.selectedItem.toString()
+            saveCategory()
+        }
+    }
 
-                if (name.isEmpty()) {
-                    Snackbar.make(buttonSaveCategory, "Введите название категории", Snackbar.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
+    private fun saveCategory() {
+        try {
+            val name = editTextCategoryName.text.toString().trim()
+            val privacy = spinnerPrivacy.selectedItem.toString()
 
-                // ----- ВОТ ИСПРАВЛЕНИЕ -----
-                // Используем именованные аргументы, чтобы id сгенерировался по умолчанию
-                val newCategory = Category(name = name, privacy = privacy)
-                // -------------------------
-
-                Log.d("AddCategory", "Category created: $name ($privacy)")
-
-                //  Возвращаем категорию обратно в MainActivity
-                val resultIntent = Intent().apply {
-                    putExtra("newCategory", newCategory)
-                }
-                setResult(Activity.RESULT_OK, resultIntent)
-                finish()
-
-            } catch (e: Exception) {
-                Log.e("AddCategory", "Error saving category: ${e.message}", e)
-                Snackbar.make(buttonSaveCategory, "Ошибка при сохранении категории", Snackbar.LENGTH_LONG).show()
+            if (name.isEmpty()) {
+                Snackbar.make(buttonSaveCategory, "Введите название категории", Snackbar.LENGTH_SHORT).show()
+                return
             }
+
+            val newCategory = Category(name = name, privacy = privacy)
+            Log.d("AddCategory", "Category created: $name ($privacy)")
+
+            val resultIntent = Intent().apply {
+                putExtra("newCategory", newCategory)
+            }
+            setResult(Activity.RESULT_OK, resultIntent)
+            finish()
+
+        } catch (e: Exception) {
+            Log.e("AddCategory", "Error saving category: ${e.message}", e)
+            Snackbar.make(buttonSaveCategory, "Ошибка при сохранении", Snackbar.LENGTH_LONG).show()
         }
     }
 }

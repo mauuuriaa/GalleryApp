@@ -42,7 +42,7 @@ class CategoryAdapter(
             privacyTextView.text = category.privacy
         }
 
-        // 1. Создание контекстного меню (для Update)
+        // 1. Создание контекстного меню
         override fun onCreateContextMenu(
             menu: android.view.ContextMenu,
             v: View?,
