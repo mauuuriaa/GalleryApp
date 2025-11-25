@@ -3,7 +3,12 @@ package com.example.galleryapp
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.Spinner
@@ -15,6 +20,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
+import java.io.*
 
 class MainActivity : BaseActivity() {
 
@@ -25,108 +31,120 @@ class MainActivity : BaseActivity() {
     private lateinit var fab: FloatingActionButton
     private lateinit var categoryAdapter: CategoryAdapter
 
-    // Лаунчер для получения результата из AddCategoryActivity
+    // SAF для создания XLS
+    private val createXlsLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri: Uri? ->
+            uri?.let { exportCategoriesToXlsUri(it) } ?: showToast("Экспорт в XLS отменён")
+        }
+
+    // SAF для создания PDF
+    private val createPdfLauncher =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
+            uri?.let { exportCategoriesToPdfUri(it) } ?: showToast("Экспорт в PDF отменён")
+        }
+
+    // Лаунчер для AddCategoryActivity
     private val addCategoryLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val data = result.data
             val newCategory = data?.getSerializableExtra("newCategory") as? Category
-            if (newCategory != null) {
-                sharedViewModel.addCategory(newCategory)
+            newCategory?.let {
+                sharedViewModel.addCategory(it)
                 sharedViewModel.saveCategoriesToStorage(this)
                 refreshRecyclerView()
-                Toast.makeText(this, "Добавлена категория: ${newCategory.name}", Toast.LENGTH_SHORT).show()
+                showToast("Добавлена категория: ${it.name}")
             }
         }
     }
 
     override fun getLayoutResId() = R.layout.activity_main
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Инициализация View
         recyclerView = findViewById(R.id.recyclerViewCategories)
         fab = findViewById(R.id.fabAddCategory)
 
-        // 1. Настройка компонентов
         setupRecyclerView()
         setupSwipeToDelete()
         setupFab()
-        setupCustomNavigationLogic() // Переопределяем логику меню для этой активити
+        setupDrawerMenuActions()
 
-        // 2. Загрузка данных
         sharedViewModel.updateCategoriesFromStorage(this)
         refreshRecyclerView()
     }
 
     private fun setupFab() {
-        fab.setOnClickListener {
-            launchAddCategoryActivity()
-        }
+        fab.setOnClickListener { launchAddCategoryActivity() }
     }
 
-    // Переопределяем клик по меню только для этой активити,
+    private fun setupDrawerMenuActions() {
+        // Главная
+        navigationView.menu.findItem(R.id.nav_main).setOnMenuItemClickListener {
+            drawerLayout.closeDrawers()
+            true
+        }
 
-    private fun setupCustomNavigationLogic() {
-        val addMenuItem = navigationView.menu.findItem(R.id.nav_add_category)
-        addMenuItem.setOnMenuItemClickListener {
+        // Добавить категорию
+        navigationView.menu.findItem(R.id.nav_add_category).setOnMenuItemClickListener {
             launchAddCategoryActivity()
+            drawerLayout.closeDrawers()
+            true
+        }
+
+        // Экспорт в XLS
+        navigationView.menu.findItem(R.id.nav_export_xls).setOnMenuItemClickListener {
+            createXlsLauncher.launch("categories.xls")
+            drawerLayout.closeDrawers()
+            true
+        }
+
+        // Экспорт в PDF
+        navigationView.menu.findItem(R.id.nav_export_pdf).setOnMenuItemClickListener {
+            createPdfLauncher.launch("categories.pdf")
             drawerLayout.closeDrawers()
             true
         }
     }
 
     private fun setupRecyclerView() {
-        categoryAdapter = CategoryAdapter { category ->
-            showEditDialog(category)
-        }
+        categoryAdapter = CategoryAdapter { showEditDialog(it) }
         recyclerView.adapter = categoryAdapter
-
-        // SpanCount 3, горизонтальный скролл
         recyclerView.layoutManager = GridLayoutManager(this, 3, RecyclerView.HORIZONTAL, false)
     }
 
     private fun setupSwipeToDelete() {
-        val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
-            0, ItemTouchHelper.UP or ItemTouchHelper.DOWN
-        ) {
+        val callback = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.UP or ItemTouchHelper.DOWN) {
             override fun onMove(r: RecyclerView, v: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder) = false
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                val position = viewHolder.adapterPosition
-                val category = categoryAdapter.currentList[position]
-
+                val category = categoryAdapter.currentList[viewHolder.adapterPosition]
                 sharedViewModel.removeCategory(category)
                 sharedViewModel.saveCategoriesToStorage(this@MainActivity)
                 refreshRecyclerView()
-
                 Snackbar.make(recyclerView, "Категория \"${category.name}\" удалена", Snackbar.LENGTH_LONG)
                     .setAction("Отмена") {
                         sharedViewModel.addCategory(category)
                         sharedViewModel.saveCategoriesToStorage(this@MainActivity)
                         refreshRecyclerView()
-                    }
-                    .show()
+                    }.show()
             }
         }
-        ItemTouchHelper(itemTouchHelperCallback).attachToRecyclerView(recyclerView)
+        ItemTouchHelper(callback).attachToRecyclerView(recyclerView)
     }
 
     private fun showEditDialog(categoryToEdit: Category) {
         val view = layoutInflater.inflate(R.layout.dialog_edit_category, null)
         val editName = view.findViewById<EditText>(R.id.editTextEditName)
         val spinnerPrivacy = view.findViewById<Spinner>(R.id.spinnerEditPrivacy)
-
-        val privacyAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, privacyLevels)
-        privacyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinnerPrivacy.adapter = privacyAdapter
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, privacyLevels)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerPrivacy.adapter = adapter
 
         editName.setText(categoryToEdit.name)
-        val currentPrivacyIndex = privacyLevels.indexOf(categoryToEdit.privacy)
-        if (currentPrivacyIndex >= 0) spinnerPrivacy.setSelection(currentPrivacyIndex)
+        spinnerPrivacy.setSelection(privacyLevels.indexOf(categoryToEdit.privacy).coerceAtLeast(0))
 
         AlertDialog.Builder(this)
             .setTitle("Редактировать категорию")
@@ -134,17 +152,12 @@ class MainActivity : BaseActivity() {
             .setPositiveButton("Сохранить") { dialog, _ ->
                 val newName = editName.text.toString().trim()
                 if (newName.isNotEmpty()) {
-                    val updatedCategory = categoryToEdit.copy(
-                        name = newName,
-                        privacy = spinnerPrivacy.selectedItem.toString()
-                    )
-                    sharedViewModel.updateCategory(updatedCategory)
+                    val updated = categoryToEdit.copy(name = newName, privacy = spinnerPrivacy.selectedItem.toString())
+                    sharedViewModel.updateCategory(updated)
                     sharedViewModel.saveCategoriesToStorage(this)
                     refreshRecyclerView()
                     dialog.dismiss()
-                } else {
-                    Toast.makeText(this, "Имя не может быть пустым", Toast.LENGTH_SHORT).show()
-                }
+                } else showToast("Имя не может быть пустым")
             }
             .setNegativeButton("Отмена", null)
             .show()
@@ -163,5 +176,78 @@ class MainActivity : BaseActivity() {
         super.onResume()
         sharedViewModel.updateCategoriesFromStorage(this)
         refreshRecyclerView()
+    }
+
+    // --- Export XLS ---
+    private fun exportCategoriesToXlsUri(uri: Uri) {
+        try {
+            val categories = sharedViewModel.getCategories()
+            if (categories.isEmpty()) { showToast("Нет категорий для экспорта"); return }
+
+            val csv = buildString {
+                append("id;name;privacy\n")  // используем ; как разделитель
+                categories.forEach { c ->
+                    val safeName = c.name.replace("\"", "\"\"")
+                    append("${c.id};\"$safeName\";${c.privacy}\n")
+                }
+            }
+
+            // Добавляем BOM для корректного отображения UTF-8
+            val bom = "\uFEFF".toByteArray(Charsets.UTF_8)
+            contentResolver.openOutputStream(uri)?.use {
+                it.write(bom)
+                it.write(csv.toByteArray(Charsets.UTF_8))
+            }
+
+            showToast("Экспорт в XLS выполнен")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "XLS export error: ${e.message}", e)
+            showToast("Ошибка при экспорте XLS")
+        }
+    }
+
+    // --- Export PDF ---
+    private fun exportCategoriesToPdfUri(uri: Uri) {
+        try {
+            val categories = sharedViewModel.getCategories()
+            if (categories.isEmpty()) { showToast("Нет категорий для экспорта"); return }
+
+            val pageWidth = 595; val pageHeight = 842
+            val document = PdfDocument()
+            val page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create())
+            val canvas = page.canvas
+            val paint = Paint().apply { textSize = 12f }
+
+            var y = 40f
+            paint.isFakeBoldText = true
+            canvas.drawText("Список категорий", 20f, y, paint)
+            paint.isFakeBoldText = false
+            y += 24f
+            canvas.drawText("ID", 20f, y, paint)
+            canvas.drawText("Name", 220f, y, paint)
+            canvas.drawText("Privacy", 460f, y, paint)
+            y += 18f
+
+            categories.forEach { c ->
+                if (y > pageHeight - 40) return@forEach
+                val displayName = if (c.name.length > 30) c.name.substring(0, 27) + "..." else c.name
+                canvas.drawText(c.id.take(20), 20f, y, paint)
+                canvas.drawText(displayName, 220f, y, paint)
+                canvas.drawText(c.privacy, 460f, y, paint)
+                y += 16f
+            }
+
+            document.finishPage(page)
+            contentResolver.openOutputStream(uri)?.use { document.writeTo(it) }
+            document.close()
+            showToast("Экспорт в PDF выполнен")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "PDF export error: ${e.message}", e)
+            showToast("Ошибка при экспорте PDF")
+        }
+    }
+
+    private fun showToast(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 }

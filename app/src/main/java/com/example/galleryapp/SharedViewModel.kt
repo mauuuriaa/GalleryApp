@@ -6,9 +6,7 @@ import androidx.lifecycle.ViewModel
 class SharedViewModel : ViewModel() {
     private var categories: MutableList<Category> = mutableListOf()
 
-    fun getCategories(): List<Category> {
-        return categories.toList()
-    }
+    fun getCategories(): List<Category> = categories.toList()
 
     fun setCategories(newCategories: List<Category>) {
         categories.clear()
@@ -16,23 +14,18 @@ class SharedViewModel : ViewModel() {
     }
 
     fun addCategory(category: Category) {
-        // Убедимся, что не добавляем дубликат по ID
         if (categories.none { it.id == category.id }) {
             categories.add(category)
         }
     }
 
-    // Удаляем по ID
     fun removeCategory(category: Category) {
         categories.removeIf { it.id == category.id }
     }
 
-    // Обновляем по ID
     fun updateCategory(updatedCategory: Category) {
         val index = categories.indexOfFirst { it.id == updatedCategory.id }
-        if (index != -1) {
-            categories[index] = updatedCategory
-        }
+        if (index != -1) categories[index] = updatedCategory
     }
 
     fun updateCategoriesFromStorage(context: Context) {

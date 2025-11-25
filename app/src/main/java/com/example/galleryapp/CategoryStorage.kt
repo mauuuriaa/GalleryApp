@@ -4,38 +4,44 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-
+import java.io.*
 object CategoryStorage {
-    private const val PREFS_NAME = "categories_prefs"
-    private const val KEY_CATEGORIES = "categories_list"
+    private const val BIN_FILENAME = "categories.bin"
 
     fun saveCategories(context: Context, categories: List<Category>) {
         try {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val json = Gson().toJson(categories)
-            prefs.edit().putString(KEY_CATEGORIES, json).apply()
-            Log.d("CategoryStorage", "Saved ${categories.size} categories to storage")
+            val file = File(context.filesDir, BIN_FILENAME)
+            ObjectOutputStream(FileOutputStream(file)).use { it.writeObject(ArrayList(categories)) }
+            Log.d("CategoryStorage", "Saved ${categories.size} categories to binary file: ${file.absolutePath}")
         } catch (e: Exception) {
-            Log.e("CategoryStorage", "Error saving categories: ${e.message}")
+            Log.e("CategoryStorage", "Error saving categories: ${e.message}", e)
         }
     }
 
     fun loadCategories(context: Context): MutableList<Category> {
         return try {
-            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val json = prefs.getString(KEY_CATEGORIES, null)
-            if (json.isNullOrEmpty()) {
-                Log.d("CategoryStorage", "No categories found in storage, returning empty list")
+            val file = File(context.filesDir, BIN_FILENAME)
+            if (!file.exists()) {
+                Log.d("CategoryStorage", "Binary file not found, returning empty list")
                 mutableListOf()
             } else {
-                val type = object : TypeToken<MutableList<Category>>() {}.type
-                val categories = Gson().fromJson<MutableList<Category>>(json, type) ?: mutableListOf()
-                Log.d("CategoryStorage", "Loaded ${categories.size} categories from storage")
-                categories
+                @Suppress("UNCHECKED_CAST")
+                val list = ObjectInputStream(FileInputStream(file)).use { it.readObject() as? MutableList<Category> }
+                Log.d("CategoryStorage", "Loaded ${list?.size ?: 0} categories from binary file")
+                list ?: mutableListOf()
             }
         } catch (e: Exception) {
-            Log.e("CategoryStorage", "Error loading categories: ${e.message}")
+            Log.e("CategoryStorage", "Error loading categories: ${e.message}", e)
             mutableListOf()
+        }
+    }
+
+    fun deleteBinaryFile(context: Context) {
+        try {
+            val file = File(context.filesDir, BIN_FILENAME)
+            if (file.exists() && file.delete()) Log.d("CategoryStorage", "Binary file deleted")
+        } catch (e: Exception) {
+            Log.e("CategoryStorage", "Error deleting binary file: ${e.message}", e)
         }
     }
 }

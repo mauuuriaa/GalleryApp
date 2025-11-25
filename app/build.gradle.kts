@@ -5,15 +5,13 @@ plugins {
 
 android {
     namespace = "com.example.galleryapp"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 34
 
 
     defaultConfig {
         applicationId = "com.example.galleryapp"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -50,6 +48,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.apache.poi:poi:5.2.3")
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
 

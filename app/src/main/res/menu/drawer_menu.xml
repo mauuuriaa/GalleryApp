@@ -1,8 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Главная -->
     <item
         android:id="@+id/nav_main"
         android:title="Главная" />
+
+    <!-- Добавить категорию -->
     <item
         android:id="@+id/nav_add_category"
         android:title="Добавить категорию" />
+
+    <!-- Экспорт данных -->
+    <item
+        android:title="Экспорт данных">
+
+        <menu>
+            <item
+                android:id="@+id/nav_export_xls"
+                android:title="Сохранить в Excel"
+                android:icon="@android:drawable/ic_menu_save" />
+
+            <item
+                android:id="@+id/nav_export_pdf"
+                android:title="Сохранить в PDF"
+                android:icon="@android:drawable/ic_menu_send" />
+        </menu>
+    </item>
+
 </menu>
