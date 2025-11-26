@@ -13,6 +13,8 @@ class SharedViewModel : ViewModel() {
         categories.addAll(newCategories)
     }
 
+
+
     fun addCategory(category: Category) {
         if (categories.none { it.id == category.id }) {
             categories.add(category)

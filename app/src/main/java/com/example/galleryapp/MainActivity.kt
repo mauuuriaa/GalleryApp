@@ -43,6 +43,12 @@ class MainActivity : BaseActivity() {
             uri?.let { exportCategoriesToPdfUri(it) } ?: showToast("Экспорт в PDF отменён")
         }
 
+    // SAF для выбора файлов (Excel/CSV)
+    private val pickFileLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            uri?.let { importFromFile(it) } ?: showToast("Выбор файла отменён")
+        }
+
     // Лаунчер для AddCategoryActivity
     private val addCategoryLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -94,6 +100,13 @@ class MainActivity : BaseActivity() {
             true
         }
 
+        // Импорт данных
+        navigationView.menu.findItem(R.id.nav_import).setOnMenuItemClickListener {
+            showImportDialog()
+            drawerLayout.closeDrawers()
+            true
+        }
+
         // Экспорт в XLS
         navigationView.menu.findItem(R.id.nav_export_xls).setOnMenuItemClickListener {
             createXlsLauncher.launch("categories.xls")
@@ -109,6 +122,131 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    // Диалог выбора типа импорта
+    private fun showImportDialog() {
+        val importTypes = arrayOf("Из Excel (.xls, .csv)", "Загрузить из бинарного файла")
+
+        AlertDialog.Builder(this)
+            .setTitle("Импорт категорий")
+            .setItems(importTypes) { dialog, which ->
+                when (which) {
+                    0 -> pickFileLauncher.launch("application/vnd.ms-excel") // Excel/CSV
+                    1 -> loadFromInternalBinaryStorage() // Бинарный файл из внутреннего хранилища
+                }
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    // Загрузка из внутреннего бинарного хранилища
+    private fun loadFromInternalBinaryStorage() {
+        try {
+            val categories = CategoryStorage.loadCategories(this)
+
+            if (categories.isNotEmpty()) {
+                sharedViewModel.setCategories(categories)
+                refreshRecyclerView()
+                showToast("Загружено ${categories.size} категорий из бинарного файла")
+            } else {
+                showToast("Бинарный файл не содержит категорий или не найден")
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Internal binary load error: ${e.message}", e)
+            showToast("Ошибка загрузки из бинарного файла")
+        }
+    }
+
+    // Импорт из Excel/CSV файла
+    private fun importFromFile(uri: Uri) {
+        try {
+            val inputStream = contentResolver.openInputStream(uri)
+            val fileName = getFileName(uri)
+
+            when {
+                fileName?.endsWith(".xls") == true || fileName?.endsWith(".csv") == true -> {
+                    importFromExcel(inputStream)
+                }
+                else -> showToast("Неподдерживаемый формат файла")
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Import error: ${e.message}", e)
+            showToast("Ошибка импорта: ${e.message}")
+        }
+    }
+
+    // Импорт из Excel/CSV
+    private fun importFromExcel(inputStream: InputStream?) {
+        try {
+            inputStream?.use { stream ->
+                val content = stream.bufferedReader().use { it.readText() }
+                val lines = content.lines()
+
+                if (lines.size < 2) {
+                    showToast("Файл не содержит данных")
+                    return
+                }
+
+                val importedCategories = mutableListOf<Category>()
+
+                // Пропускаем заголовок и обрабатываем данные
+                lines.drop(1).forEach { line ->
+                    if (line.isNotBlank()) {
+                        // Формат: id;"name";privacy
+                        val parts = line.split(';')
+                        if (parts.size >= 3) {
+                            val id = parts[0].trim()
+                            var name = parts[1].trim()
+
+                            // Убираем кавычки если есть
+                            if (name.startsWith("\"") && name.endsWith("\"")) {
+                                name = name.substring(1, name.length - 1)
+                            }
+
+                            val privacy = parts[2].trim()
+
+                            if (name.isNotEmpty()) {
+                                importedCategories.add(Category(id = id, name = name, privacy = privacy))
+                            }
+                        }
+                    }
+                }
+
+                if (importedCategories.isNotEmpty()) {
+                    sharedViewModel.setCategories(importedCategories)
+                    sharedViewModel.saveCategoriesToStorage(this)
+                    refreshRecyclerView()
+                    showToast("Импортировано ${importedCategories.size} категорий из Excel")
+                } else {
+                    showToast("Не удалось найти категории в файле")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Excel import error: ${e.message}", e)
+            showToast("Ошибка импорта Excel файла")
+        }
+    }
+
+    // Вспомогательная функция для получения имени файла
+    private fun getFileName(uri: Uri): String? {
+        return try {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val displayNameIndex = cursor.getColumnIndex("_display_name")
+                    if (displayNameIndex != -1) {
+                        cursor.getString(displayNameIndex)
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Остальные методы без изменений...
     private fun setupRecyclerView() {
         categoryAdapter = CategoryAdapter { showEditDialog(it) }
         recyclerView.adapter = categoryAdapter

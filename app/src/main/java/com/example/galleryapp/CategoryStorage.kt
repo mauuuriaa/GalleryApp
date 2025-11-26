@@ -36,12 +36,5 @@ object CategoryStorage {
         }
     }
 
-    fun deleteBinaryFile(context: Context) {
-        try {
-            val file = File(context.filesDir, BIN_FILENAME)
-            if (file.exists() && file.delete()) Log.d("CategoryStorage", "Binary file deleted")
-        } catch (e: Exception) {
-            Log.e("CategoryStorage", "Error deleting binary file: ${e.message}", e)
-        }
-    }
+
 }

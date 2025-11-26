@@ -11,6 +11,12 @@
         android:id="@+id/nav_add_category"
         android:title="Добавить категорию" />
 
+    <!-- Импорт данных -->
+    <item
+        android:id="@+id/nav_import"
+        android:title="Импорт данных"
+        android:icon="@android:drawable/ic_menu_upload" />
+
     <!-- Экспорт данных -->
     <item
         android:title="Экспорт данных">
